@@ -1,4 +1,20 @@
-﻿function Get-CimEscapedPath {
+﻿function Get-FullPath {
+    param(
+        [parameter(Mandatory)]
+        [string]$Path
+    )
+    if($PSVersionTable.PSEdition -eq 'Core') {
+        [io.path]::GetFullPath($Path)
+    } else {
+        $BindingFlags= [Reflection.BindingFlags] "NonPublic,Static"
+        [type[]]$paramTypes= [string],[bool],[int]
+        $NormalizePathMethod = [System.IO.Path].GetMethod("NormalizePath",$bindingFlags,$null,$paramTypes,$null)
+        $NormalizePathMethod.Invoke($null,@($Path,$true,65535))
+    }
+}
+
+
+function Get-CimEscapedPath {
     param(
         [string]$Path
     )
@@ -125,7 +141,7 @@ function Get-CimFile
                 }
             }
 
-            $filepath = [System.IO.Path]::GetFullPath([System.IO.Path]::Combine($pwd.Path,$_path))                 
+            $filepath = Get-FullPath([System.IO.Path]::Combine($pwd.Path,$_path))                 
             if($filepath -notlike '*\') {
                 $fileObj = Get-CimInstance -ClassName CIM_LogicalFile -Filter ("Name = '{0}'" -f (Get-CimEscapedPath $filepath) ) 
                 if($fileObj.Count -eq 1 -and $fileObj.CimClass.CimClassName -eq 'CIM_Datafile') {
