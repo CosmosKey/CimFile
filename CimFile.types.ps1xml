@@ -1,0 +1,78 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<Types>
+  <Type>
+    <Name>Microsoft.Management.Infrastructure.CimInstance#ROOT/cimv2/CIM_LogicalFile</Name>
+    <Members>
+      <ScriptProperty>
+        <Name>Mode</Name>
+        <GetScriptBlock>
+            $mode = [char[]]::new(6)
+            if($this.CimClass.CimClassName -eq &apos;CIM_DataFile&apos;) {
+                $mode[0] = 45
+            } else {
+                $mode[0] = 100
+            }
+            if($this.Archive) {
+                $mode[1] = 97
+            } else {
+                $mode[1] = 45
+            }
+            if($this.Writeable) {
+                $mode[2] = 45
+            } else {
+                $mode[2] = 114
+            }
+            if($this.Hidden) {
+                $mode[3] = 104
+            } else {
+                $mode[3] = 45
+            }
+            if($this.System) {
+                $mode[4] = 115
+            } else {
+                $mode[4] = 45 
+            }
+            $mode[5] = 45
+            [string]::new($mode)
+        </GetScriptBlock>
+      </ScriptProperty>      
+      <ScriptProperty>
+        <Name>Fullname</Name>
+        <GetScriptBlock>
+          $this.Caption
+        </GetScriptBlock>
+      </ScriptProperty>      
+      <ScriptProperty>
+        <Name>BaseName</Name>
+        <GetScriptBlock>
+          $this.FileName
+        </GetScriptBlock>
+      </ScriptProperty> 
+      <ScriptProperty>
+        <Name>Name</Name>
+        <GetScriptBlock>
+          Split-Path $this.Caption -Leaf
+        </GetScriptBlock>
+      </ScriptProperty> 
+      <ScriptProperty>
+        <Name>Directory</Name>
+        <GetScriptBlock>
+          Split-Path $this.Caption
+        </GetScriptBlock>
+      </ScriptProperty>            
+      <MemberSet>
+        <Name>PSStandardMembers</Name>
+        <Members>
+          <PropertySet>
+            <Name>DefaultDisplayPropertySet</Name>
+            <ReferencedProperties>
+              <Name>LastModified</Name>
+              <Name>FileSize</Name>
+              <Name>FileName</Name>
+            </ReferencedProperties>
+          </PropertySet>
+        </Members>
+      </MemberSet>
+    </Members>
+  </Type>
+</Types>
