@@ -26,9 +26,69 @@ function Add-PSType {
     }
 }
 
+<#
+.SYNOPSIS
+
+    Gets the files and folders using CIM.
+
+.DESCRIPTION
+
+    The Get-CimFile cmdlet gets the files and folders in one or more specified locations. If the path specified is a folder, it gets the files and folders inside the container.
+
+.PARAMETER Path
+
+    Specifies a path to one or more folder or files. Wildcards are permitted. The default location is the current directory (.).
+
+.PARAMETER Filter
+
+    Specifies a file search wildcard filter.
+
+.PARAMETER Recurse
+
+    Indicates that this cmdlet gets the files and folders in the specified locations and in all child folders of the locations.
+
+.PARAMETER File
+
+    Gets only files.
+
+.PARAMETER Directory
+
+    Gets only directories.
+
+.PARAMETER CimSession
+
+    Specifies the CIM session to use for this cmdlet. Enter a variable that contains the CIM session or a command that creates or gets the CIM session, such as the New-CimSession or Get-CimSession cmdlets. For more information, see about_CimSessions.
+
+.EXAMPLE
+
+    Get-CimFile -Path $home
+
+    Gets all the files and folders in the home directory
+
+.EXAMPLE
+
+    ${env:ProgramFiles(x86)},$env:ProgramFiles | Get-CimFile -Filter *Microsoft* -Directory
+
+    List all folders containing the string 'Microsoft' in both the 32-bit and 64-bit program files folders 
+
+.EXAMPLE
+    
+    PS C:\>$cimSession = New-CimSession -ComputerName SRV01
+    PS C:\>Get-CimFile -CimSession $cimSession -Path c:\Users -Directory
+
+    Gets all the folders in the C:\Users folder on server SRV01
+
+.EXAMPLE
+
+    "$home\OneDrive" | Get-CimFile -Filter *.ps1 -Recurse -File
+
+    This will list all the *.ps1 files in the users OneDrive folder.
+    
+#>
+
 function Get-CimFile
 {
-    [cmdletbinding(DefaultParameterSetName='FilesOnly', PositionalBinding)]
+    [cmdletbinding(DefaultParameterSetName='All', PositionalBinding)]
     param(
         [parameter(Position=1,ValueFromPipeline)]
         [string[]]$Path = $PWD.Path,        
@@ -38,7 +98,7 @@ function Get-CimFile
         [switch]$Directory,
         [Parameter(ParameterSetName='FilesOnly')]
         [switch]$File,
-        [CimSession[]]$CimSession
+        [CimSession]$CimSession
     )
     begin {
         $cimSessionParam = @{}
@@ -48,6 +108,7 @@ function Get-CimFile
     }
     process {
         foreach($_path in $Path) {
+            Write-Verbose "Querying CIM for path: $_path and filter $Filter. Parameter -File is $File, -Directory is $Directory and CimSession $CimSession "
             $_path = $_path.Trim()
             if( [WildcardPattern]::ContainsWildcardCharacters($_path) ) { 
                 $li = $_path.LastIndexOf('\')
@@ -64,7 +125,7 @@ function Get-CimFile
             $filepath = [System.IO.Path]::GetFullPath([System.IO.Path]::Combine($pwd.Path,$_path))                 
             if($filepath -notlike '*\') {
                 $fileObj = Get-CimInstance -ClassName CIM_LogicalFile -Filter ("Name = '{0}'" -f (Get-CimEscapedPath $filepath) ) 
-                if($fileObj.CimClass.CimClassName -eq 'CIM_Datafile') {
+                if($fileObj.Count -eq 1 -and $fileObj.CimClass.CimClassName -eq 'CIM_Datafile') {
                     $fileObj | Add-PSType -TypeName 'CIMFile' -Passthru 
                     return
                 } else {
@@ -74,19 +135,21 @@ function Get-CimFile
             $drive,$remainderPath = $filepath.Split(':')
             
             $likeFilter = ([Management.Automation.WildcardPattern]$Filter).ToWql().Trim()   
-            $cimFilter = "drive = '{0}:' and path ='{1}' and name like '{0}:{1}{2}' " -f $drive,(Get-CimEscapedPath $remainderPath),$likeFilter
-
-            foreach($folder in Get-CimInstance -ClassName win32_directory -Filter $cimFilter @cimSessionParam) {
-                if($Recurse) {
+            $cimFilter        = "drive = '{0}:' and path ='{1}' and name like '{0}:{1}{2}' " -f $drive,(Get-CimEscapedPath $remainderPath),$likeFilter
+            $cimRecurseFilter = "drive = '{0}:' and path ='{1}' "                            -f $drive,(Get-CimEscapedPath $remainderPath)
+            
+            if($Recurse) {                
+                foreach($folder in Get-CimInstance -ClassName WIN32_Directory -Filter $cimRecurseFilter @cimSessionParam) {
                     $PSBoundParameters['Path'] = Join-Path $_path $folder.FileName
+                    $PSBoundParameters['Filter'] = $Filter
                     & $MyInvocation.MyCommand @PSBoundParameters
                 }
-                if( -not $File) {
-                    $folder | Add-PSType -TypeName 'CIMFolder' -Passthru 
-                }
+            }
+            if( -not $File) {
+                Get-CimInstance -ClassName WIN32_Directory -Filter $cimFilter @cimSessionParam | Add-PSType -TypeName 'CIMFolder' -Passthru
             }
             if( -not $Directory) {
-                Get-CimInstance -ClassName CIM_Datafile -Filter $cimFilter @cimSessionParam | Add-PSType -TypeName 'CIMFile' -Passthru
+                Get-CimInstance -ClassName CIM_Datafile    -Filter $cimFilter @cimSessionParam | Add-PSType -TypeName 'CIMFile'   -Passthru
             }
         }
     }
