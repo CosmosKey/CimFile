@@ -88,16 +88,19 @@ function Add-PSType {
 
 function Get-CimFile
 {
-    [cmdletbinding(DefaultParameterSetName='All', PositionalBinding)]
+    [cmdletbinding(DefaultParameterSetName='FilesOnly', PositionalBinding)]
     param(
-        [parameter(Position=1,ValueFromPipeline)]
+        [parameter( Position = 1, ValueFromPipeline )]
         [string[]]$Path = $PWD.Path,        
+        [SupportsWildcards()]
+        [parameter( Position = 2 )]
         [string]$Filter = '*',
         [switch]$Recurse,
-        [Parameter(ParameterSetName='DirectoriesOnly')]
+        [Parameter( ParameterSetName = 'DirectoriesOnly' )]
         [switch]$Directory,
-        [Parameter(ParameterSetName='FilesOnly')]
+        [Parameter( ParameterSetName = 'FilesOnly' )]
         [switch]$File,
+        [parameter( Position = 3)]
         [CimSession]$CimSession
     )
     begin {
@@ -134,7 +137,7 @@ function Get-CimFile
             }
             $drive,$remainderPath = $filepath.Split(':')
             
-            $likeFilter = ([Management.Automation.WildcardPattern]$Filter).ToWql().Trim()   
+            $likeFilter = ([WildcardPattern]$Filter).ToWql().Trim()   
             $cimFilter        = "drive = '{0}:' and path ='{1}' and name like '{0}:{1}{2}' " -f $drive,(Get-CimEscapedPath $remainderPath),$likeFilter
             $cimRecurseFilter = "drive = '{0}:' and path ='{1}' "                            -f $drive,(Get-CimEscapedPath $remainderPath)
             
